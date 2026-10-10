@@ -67,6 +67,19 @@ function Menu({ cart, setCart }) {
     setCart((c) => ({ ...c, [id]: { product: p, quantity: Number(c[id]?.quantity || 0) + 1 } }));
     show(`${p.name} added`);
   };
+  const changeQty = (p, delta) => {
+    const id = getProductId(p);
+    setCart((c) => {
+      const next = { ...c };
+      const quantity = Number(next[id]?.quantity || 0) + delta;
+      if (quantity <= 0) {
+        delete next[id];
+      } else {
+        next[id] = { product: next[id]?.product || p, quantity };
+      }
+      return next;
+    });
+  };
 
   return <main className="page menuPage">
     {toast && <div className="toast">{toast}</div>}
@@ -82,15 +95,19 @@ function Menu({ cart, setCart }) {
       <input placeholder="Search puffs, coffee, desserts..." value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="chips">{filters.map((f) => <button className={active === f ? "chip on" : "chip"} onClick={() => setActive(f)} key={f}>{f}</button>)}</div>
     </div>
-    <section id="products" className="grid">{shown.map((p) => <article className="card" key={p._id}>
+    <section id="products" className="grid">{shown.map((p) => {
+      const id = getProductId(p);
+      const quantity = Number(cart[id]?.quantity || 0);
+      return <article className="card" key={id}>
       <ProductImage src={p.imageUrl} alt={p.name} />
       <div className="cardBody">
         <div className="cardTitle"><h3>{p.name}</h3><strong>{money(p.price)}</strong></div>
         <p>{p.description}</p>
         <div className="tags">{p.isBestSeller && <small>Best Seller</small>}{p.isSignature && <small>Signature</small>}{p.isRecommended && <small>Recommended</small>}</div>
       </div>
-      <footer><span>{p.category}</span><button disabled={!p.isAvailable} onClick={() => add(p)}><Plus size={16}/> Add</button></footer>
-    </article>)}</section>
+      <footer><span>{p.category}</span>{quantity > 0 ? <div className="qtyControl"><button type="button" aria-label={`Decrease ${p.name}`} onClick={() => changeQty(p, -1)}><Minus size={16}/></button><strong>{quantity}</strong><button type="button" aria-label={`Increase ${p.name}`} onClick={() => changeQty(p, 1)}><Plus size={16}/></button></div> : <button disabled={!p.isAvailable} onClick={() => add(p)}><Plus size={16}/> Add</button>}</footer>
+    </article>;
+    })}</section>
     {cartCount > 0 && <Link className="bottomCart" to="/checkout"><ShoppingCart size={18}/>{cartCount} items - Checkout</Link>}
   </main>;
 }
