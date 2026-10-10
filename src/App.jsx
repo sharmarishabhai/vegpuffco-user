@@ -8,6 +8,7 @@ import "./style.css";
 const API = import.meta.env.VITE_API_URL || "http://localhost:8999";
 const fallbackImage = "/vegpuff-logo.png";
 const money = (n) => `Rs. ${Number(n || 0).toFixed(0)}`;
+const getProductId = (product) => product?._id || product?.id;
 
 async function request(path, options = {}) {
   const res = await fetch(`${API}${path}`, {
@@ -62,7 +63,8 @@ function Menu({ cart, setCart }) {
     return (active === "All" || p.category === active || tagMatch) && p.name.toLowerCase().includes(q.toLowerCase());
   });
   const add = (p) => {
-    setCart((c) => ({ ...c, [p._id]: { product: p, quantity: (c[p._id]?.quantity || 0) + 1 } }));
+    const id = getProductId(p);
+    setCart((c) => ({ ...c, [id]: { product: p, quantity: Number(c[id]?.quantity || 0) + 1 } }));
     show(`${p.name} added`);
   };
 
@@ -97,15 +99,23 @@ function CartLines({ cart, setCart }) {
   const items = Object.values(cart);
   const qty = (id, d) => setCart((c) => {
     const next = { ...c };
-    next[id].quantity += d;
-    if (next[id].quantity <= 0) delete next[id];
+    if (!next[id]) return next;
+    const quantity = Number(next[id].quantity || 0) + d;
+    if (quantity <= 0) {
+      delete next[id];
+    } else {
+      next[id] = { ...next[id], quantity };
+    }
     return next;
   });
   if (!items.length) return <p className="empty">Your cart is waiting for something delicious.</p>;
-  return <>{items.map((i) => <div className="line cartLine" key={i.product._id}>
-    <b>{i.product.name}</b><span>{money(i.product.price * i.quantity)}</span>
-    <button onClick={() => qty(i.product._id, -1)}><Minus size={14}/></button><em>{i.quantity}</em><button onClick={() => qty(i.product._id, 1)}><Plus size={14}/></button>
-  </div>)}</>;
+  return <>{items.map((i) => {
+    const id = getProductId(i.product);
+    return <div className="line cartLine" key={id}>
+      <b>{i.product.name}</b><span>{money(i.product.price * i.quantity)}</span>
+      <button type="button" aria-label={`Decrease ${i.product.name}`} onClick={() => qty(id, -1)}><Minus size={16}/></button><em>{i.quantity}</em><button type="button" aria-label={`Increase ${i.product.name}`} onClick={() => qty(id, 1)}><Plus size={16}/></button>
+    </div>;
+  })}</>;
 }
 
 function Cart({ cart, setCart }) {
@@ -126,7 +136,7 @@ function Checkout({ cart, setCart }) {
     setBusy(true);
     setError("");
     try {
-      const order = await request("/api/orders", { method: "POST", body: JSON.stringify({ customer, items: items.map((i) => ({ productId: i.product._id, quantity: i.quantity })) }) });
+      const order = await request("/api/orders", { method: "POST", body: JSON.stringify({ customer, items: items.map((i) => ({ productId: getProductId(i.product), quantity: Number(i.quantity || 1) })) }) });
       const saved = JSON.parse(localStorage.vpcOrderNos || "[]").filter((n) => n !== order.orderNo);
       localStorage.vpcOrderNos = JSON.stringify([order.orderNo, ...saved].slice(0, 20));
       localStorage.vpcMobile = customer.mobile;
